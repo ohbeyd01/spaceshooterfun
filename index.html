@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Shooter Game</title>
+    <link rel="stylesheet" href="styles.css">
+
+<style>
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #001f33; /* Dark blue background */
+    color: #FFFFFF;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+}
+
+header {
+    text-align: center;
+    padding: 20px;
+}
+
+header h1 {
+    font-size: 2.5em;
+    color: #FFD700;
+}
+
+header p {
+    font-size: 1.2em;
+}
+
+canvas {
+    border: 2px solid #FFD700;
+    background: url('path/to/space-background.jpg') no-repeat center center; /* Optional background */
+    display: block;
+}
+
+.scoreboard {
+    margin: 20px;
+    font-size: 1.5em;
+}
+
+footer {
+    position: absolute;
+    bottom: 20px;
+    text-align: center;
+    font-size: 1em;
+}
+
+footer p {
+    color: #FFD700;
+}
+
+.player {
+    background: url('path/to/cartoon-character.png') no-repeat center center; /* Add your cartoon character image */
+    width: 60px;  /* Adjust size */
+    height: 60px; /* Adjust size */
+    position: absolute;
+}
+
+
+</style>
+
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Space Shooter</h1>
+            <p>Destroy the asteroids and survive as long as you can!</p>
+        </header>
+        <canvas id="gameCanvas"></canvas>
+        <div class="scoreboard">
+            <span id="score">Score: 0</span>
+            <span id="level">Level: 1</span>
+        </div>
+        <footer>
+            <p>Press <strong>Space</strong> to shoot and arrow keys to move.</p>
+        </footer>
+    </div>
+    <script>
+
+// Get canvas and context
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Set canvas size
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Global Variables
+let player, projectiles = [], asteroids = [], score = 0, level = 1, gameOver = false;
+const colors = ["#00FF00", "#FF0000", "#FFD700", "#00BFFF"];
+const keys = { left: false, right: false, up: false, down: false, space: false };
+
+// Event Listeners for Controls
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'ArrowLeft') keys.left = true;
+    if (e.code === 'ArrowRight') keys.right = true;
+    if (e.code === 'ArrowUp') keys.up = true;
+    if (e.code === 'ArrowDown') keys.down = true;
+    if (e.code === 'Space') keys.space = true;
+});
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowLeft') keys.left = false;
+    if (e.code === 'ArrowRight') keys.right = false;
+    if (e.code === 'ArrowUp') keys.up = false;
+    if (e.code === 'ArrowDown') keys.down = false;
+    if (e.code === 'Space') keys.space = false;
+});
+
+// Utility function to generate random number within a range
+function randomRange(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+// Spaceship (Player)
+class Spaceship {
+    constructor() {
+        this.width = 50;
+        this.height = 50;
+        this.x = canvas.width / 2 - this.width / 2;
+        this.y = canvas.height - this.height - 20;
+        this.speed = 5;
+        this.color = "#FFFFFF";
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+
+    update() {
+        if (keys.left && this.x > 0) this.x -= this.speed;
+        if (keys.right && this.x < canvas.width - this.width) this.x += this.speed;
+        if (keys.up && this.y > 0) this.y -= this.speed;
+        if (keys.down && this.y < canvas.height - this.height) this.y += this.speed;
+
+        this.draw();
+    }
+
+    shoot() {
+        if (keys.space) {
+            projectiles.push(new Projectile(this.x + this.width / 2, this.y));
+            keys.space = false;  // Prevent holding down space to shoot too fast
+        }
+    }
+}
+
+// Projectile (Laser)
+class Projectile {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 5;
+        this.height = 10;
+        this.speed = 7;
+        this.color = "#FFD700";
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+
+    update() {
+        this.y -= this.speed;
+        this.draw();
+    }
+}
+
+// Asteroid (Enemy)
+class Asteroid {
+    constructor(level) {
+        this.radius = randomRange(20 + level * 5, 50 + level * 5);
+        this.x = randomRange(0, canvas.width - this.radius);
+        this.y = 0 - this.radius;
+        this.speed = randomRange(2 + level * 0.5, 5 + level * 0.5);
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    update() {
+        this.y += this.speed;
+        this.draw();
+    }
+}
+
+// Collision Detection
+function detectCollision(object1, object2) {
+    const dist = Math.hypot(object1.x - object2.x, object1.y - object2.y);
+    return dist < object1.radius + object2.width / 2;
+}
+
+// Game Over Screen
+function displayGameOver() {
+    ctx.fillStyle = "red";
+    ctx.font = "50px Arial";
+    ctx.fillText("Game Over!", canvas.width / 2 - 150, canvas.height / 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "30px Arial";
+    ctx.fillText(`Score: ${score}`, canvas.width / 2 - 50, canvas.height / 2 + 50);
+}
+
+// Score Display
+function displayScore() {
+    document.getElementById('score').innerText = `Score: ${score}`;
+    document.getElementById('level').innerText = `Level: ${level}`;
+}
+
+// Initialize Player
+function init() {
+    player = new Spaceship();
+}
+
+// Level Up
+function levelUp() {
+    level++;
+    score += 50;  // Bonus for leveling up
+    // Increase difficulty, like speed and frequency of asteroids
+}
+
+// Game Loop
+function gameLoop() {
+    if (gameOver) {
+        displayGameOver();
+        return;
+    }
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Update player
+    player.update();
+    player.shoot();
+
+    // Update projectiles
+    projectiles.forEach((projectile, index) => {
+        projectile.update();
+
+        // Remove projectile if it goes off-screen
+        if (projectile.y < 0) {
+            projectiles.splice(index, 1);
+        }
+    });
+
+    // Spawn asteroids
+    if (Math.random() < 0.02) {
+        asteroids.push(new Asteroid(level));
+    }
+
+    // Update asteroids
+    asteroids.forEach((asteroid, asteroidIndex) => {
+        asteroid.update();
+
+        // Check for collisions with player (Game Over)
+        if (detectCollision(asteroid, player)) {
+            gameOver = true;
+        }
+
+        // Check for collisions with projectiles
+        projectiles.forEach((projectile, projectileIndex) => {
+            if (detectCollision(asteroid, projectile)) {
+                // Destroy asteroid and projectile
+                asteroids.splice(asteroidIndex, 1);
+                projectiles.splice(projectileIndex, 1);
+                score += 10;  // Increase score
+                if (score % 100 === 0) {
+                    levelUp(); // Level up every 100 points
+                }
+            }
+        });
+
+        // Remove asteroid if it goes off-screen
+        if (asteroid.y > canvas.height) {
+            asteroids.splice(asteroidIndex, 1);
+        }
+    });
+
+    // Display score and level
+    displayScore();
+
+    // Call gameLoop again
+    requestAnimationFrame(gameLoop);
+}
+
+// Start the game
+init();
+gameLoop();
+
+
+    </script>
+</body>
+</html>
